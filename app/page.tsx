@@ -54,6 +54,12 @@ export default function HiveTicketTracker() {
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
   const [isAuthEnabled, setIsAuthEnabled] = useState(true); // Default to true on new devices
 
+  // App-level password gate
+  const [isAppAuthenticated, setIsAppAuthenticated] = useState(false);
+  const [gatePassword, setGatePassword] = useState("");
+  const [gateError, setGateError] = useState("");
+  const [isGateShaking, setIsGateShaking] = useState(false);
+
   // Custom Select State
   const [isTimeUnitOpen, setIsTimeUnitOpen] = useState(false);
   const [isShiftOpen, setIsShiftOpen] = useState(false);
@@ -160,7 +166,28 @@ export default function HiveTicketTracker() {
       // If null (first time) or true, default to locked
       setIsAuthEnabled(true);
     }
+
+    // Check app-level gate authentication
+    const appAuth = localStorage.getItem("appAuthenticated");
+    if (appAuth === "true") {
+      setIsAppAuthenticated(true);
+    }
   }, []);
+
+  const handleGateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (gatePassword === STATIC_PIN) {
+      localStorage.setItem("appAuthenticated", "true");
+      setIsAppAuthenticated(true);
+      setGateError("");
+      setGatePassword("");
+    } else {
+      setGateError("Incorrect password. Please try again.");
+      setGatePassword("");
+      setIsGateShaking(true);
+      setTimeout(() => setIsGateShaking(false), 600);
+    }
+  };
 
   const handleToggleAuth = async () => {
     const pin = await requestPin(
@@ -302,6 +329,96 @@ export default function HiveTicketTracker() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans p-6 md:p-12">
+
+      {/* ── App-Level Password Gate ── */}
+      {!isAppAuthenticated && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-neutral-950">
+          {/* Ambient glow */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px]" />
+            <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[100px]" />
+          </div>
+
+          <div
+            className={`relative w-full max-w-md mx-4 transition-all duration-300 ${
+              isGateShaking ? "animate-[shake_0.6s_ease-in-out]" : ""
+            }`}
+          >
+            {/* Card */}
+            <div className="bg-neutral-900 border border-neutral-800 rounded-3xl p-8 shadow-2xl shadow-black/60 backdrop-blur-xl">
+              {/* Logo / Icon */}
+              <div className="flex flex-col items-center mb-8">
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 bg-emerald-500 rounded-2xl blur-xl opacity-30" />
+                  <div className="relative p-4 bg-neutral-800 border border-neutral-700 rounded-2xl">
+                    <Lock className="w-8 h-8 text-emerald-400" />
+                  </div>
+                </div>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight">
+                  Ticket Manager
+                </h1>
+                <p className="text-neutral-500 text-sm mt-1 text-center">
+                  Enter your access password to continue
+                </p>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleGateSubmit} className="space-y-4">
+                <div className="relative">
+                  <input
+                    type="password"
+                    autoFocus
+                    required
+                    placeholder="Enter password"
+                    value={gatePassword}
+                    onChange={(e) => {
+                      setGatePassword(e.target.value.replace(/[^0-9]/g, ""));
+                      setGateError("");
+                    }}
+                    maxLength={4}
+                    className={`w-full bg-neutral-950 border rounded-xl px-4 py-4 text-center text-sm tracking-[1em] indent-[1em] text-white font-mono focus:outline-none focus:ring-2 transition-all ${
+                      gateError
+                        ? "border-red-500/70 focus:ring-red-500"
+                        : "border-neutral-800 focus:ring-emerald-500 focus:border-transparent"
+                    }`}
+                  />
+                </div>
+
+                {gateError && (
+                  <p className="text-red-400 text-sm text-center font-medium flex items-center justify-center gap-1.5 animate-in fade-in duration-200">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-400" />
+                    {gateError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 px-4 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-500 active:scale-[0.98] transition-all shadow-lg shadow-emerald-600/20 text-sm tracking-wide cursor-pointer"
+                >
+                  Unlock Access
+                </button>
+              </form>
+
+              {/* Footer */}
+              <p className="text-center text-neutral-600 text-xs mt-6">
+                Protected workspace · Hive Ticket Tracker
+              </p>
+            </div>
+          </div>
+
+          <style>{`
+            @keyframes shake {
+              0%, 100% { transform: translateX(0); }
+              15%       { transform: translateX(-8px); }
+              30%       { transform: translateX(8px); }
+              45%       { transform: translateX(-6px); }
+              60%       { transform: translateX(6px); }
+              75%       { transform: translateX(-4px); }
+              90%       { transform: translateX(4px); }
+            }
+          `}</style>
+        </div>
+      )}
       {isLoading && (
         <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-neutral-950 animate-in fade-in duration-500">
           <div className="relative">
